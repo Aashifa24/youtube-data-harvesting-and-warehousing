@@ -14,9 +14,9 @@ import re
 dotenv.load_dotenv()
 
 #Access Environment variables using os.gentenv() methods
-HOST_NAME = 'localhost'
-USER_NAME = 'root'
-PASS = 'aashi'
+HOST_NAME = 'your_host'
+USER_NAME = 'your_user'
+PASS = 'your_password'
 
 
 api_key ='AIzaSyCCSZxuJKwkCy1DVsUS5e6fqp00jiTOfpA'
