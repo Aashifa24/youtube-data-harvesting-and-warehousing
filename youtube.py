@@ -19,7 +19,7 @@ USER_NAME = 'your_user'
 PASS = 'your_password'
 
 
-api_key ='AIzaSyCCSZxuJKwkCy1DVsUS5e6fqp00jiTOfpA'
+api_key ='your_api_key'
 youtube = build('youtube','v3', developerKey=api_key)
 
 #Fetch channel data using api key
