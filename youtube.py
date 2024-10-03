@@ -225,9 +225,9 @@ def Fetch_comment_data(newchannel_id):
     
     #Inserting the fetched data into MYSQL database
     mydb = mysql.connector.connect(
-                host='localhost',
-                user='root',
-                password='aashi',
+                host='your_host',
+                user='your_root',
+                password='your_password',
                 database ="youtube_data"
                 )
     cursor = mydb.cursor()
