@@ -1,24 +1,15 @@
 #Import necessary libraries
-import os
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 import streamlit as st
 import pandas as pd
 import mysql.connector 
-import dotenv
 from dateutil import parser
+from mysql.connector import IntegrityError
 import re
 
 
-#load environment variables from the .env file
-dotenv.load_dotenv()
-
-#Access Environment variables using os.gentenv() methods
-HOST_NAME = 'your_host'
-USER_NAME = 'your_user'
-PASS = 'your_password'
-
-
+#define api_key, api_service_name, api_version
 api_key ='your_api_key'
 youtube = build('youtube','v3', developerKey=api_key)
 
@@ -26,9 +17,9 @@ youtube = build('youtube','v3', developerKey=api_key)
 def fetch_channel_data(newchannel_id):
     try:
          mydb = mysql.connector.connect(
-                host=HOST_NAME,
-                user=USER_NAME,
-                password=PASS,
+                host='your_host',
+                user='your_root',
+                password='your_password',
                 database ="youtube_data"
                 )
          cursor = mydb.cursor()
@@ -156,13 +147,12 @@ def fetch_video_data(all_videos_ids):
                        "Video_caption":i["contentDetails"]["caption"]
             }
 
-
             video_info.append(given)
     #Inserting fetched data into MYSQL database        
     mydb = mysql.connector.connect(
-                host=HOST_NAME,
-                user=USER_NAME,
-                password=PASS,
+                host='your_host',
+                user='your_root',
+                password='your_oassword',
                 database ="youtube_data"
                 )
     cursor = mydb.cursor()
@@ -183,14 +173,18 @@ def fetch_video_data(all_videos_ids):
                       FOREIGN KEY (channel_id) REFERENCES Channels(channel_id)  ON DELETE CASCADE )''')
     
     for video in video_info:
-        cursor.execute('''INSERT INTO Videos VALUES(%s, %s, %s, %s, %s, %s,
+        try:
+            cursor.execute('''INSERT INTO Videos VALUES(%s, %s, %s, %s, %s, %s,
                        %s, %s, %s, %s, %s, %s, %s)''',(video["Video_Id"], 
                        video["Video_title"],video["Video_Description"],video["Video_Tags"],
                        video["Video_pubdate"],video["Video_viewcount"],video["Video_likecount"],video["Video_favoritecount"],
                        video["Video_commentcount"],video["Video_duration"],video["Video_thumbnails"],video["Video_caption"],video["channel_id"]))
         
-    mydb.commit()
-    mydb.close()
+            mydb.commit()
+            st.success(f"Video '{video['Video_title']}' inserted successfully!")
+        except IntegrityError as e:
+        # Handle duplicate entry error
+            st.error(f"Duplicate entry for video '{video['Video_title']}'. Video_Id '{video['Video_Id']}' already exists.")
 
     return pd.DataFrame(video_info)
 
@@ -228,11 +222,12 @@ def Fetch_comment_data(newchannel_id):
     if not comment_data:
         st.text("No comment data found.")
         return pd.DataFrame()
+    
     #Inserting the fetched data into MYSQL database
     mydb = mysql.connector.connect(
-                host=HOST_NAME,
-                user=USER_NAME,
-                password=PASS,
+                host='localhost',
+                user='root',
+                password='aashi',
                 database ="youtube_data"
                 )
     cursor = mydb.cursor()
@@ -281,9 +276,9 @@ def iso8601_duration_to_seconds(duration):
 #Fetch data from MYSQL database
 def fetch_data(query):
     mydb =  mysql.connector.connect(
-                host=HOST_NAME,
-                user=USER_NAME,
-                password=PASS,
+                host='your_host',
+                user='your_root',
+                password='your_password',
                 database ="youtube_data"
                 )
     df = pd.read_sql(query, mydb)
@@ -304,33 +299,35 @@ def execute_query(question):
                  GROUP BY channel_name
                  ORDER BY video_count DESC;""",
         "What are the top 10 most viewed videos and their respective channels?": 
-		         """SELECT video_title,channel_name 
+		         """SELECT video_title,channel_name, video_viewcount
                  FROM Videos AS v
                  JOIN Channels AS ch ON ch.channel_id =v.channel_id 
                  ORDER BY video_viewcount DESC 
                  LIMIT 10;""",
         "How many comments were made on each video, and what are their corresponding video names?": 
-		         """SELECT video_title, COUNT(*) AS comment_counts
-                 FROM Videos 
-                 JOIN Comments on Videos.video_id=Comments.video_id
-                 GROUP BY video_title;""",
-        "Which videos have the highest number of likes, and what are their corresponding channel names?": 
-		         """SELECT video_title,channel_name
+		         '''SELECT channel_name, video_title, COUNT(Comments.comment_id) AS comment_counts
+                    FROM Videos
+                    JOIN Channels ON Channels.channel_id = Videos.channel_id
+                    JOIN Comments ON Videos.video_id = Comments.video_id
+                    GROUP BY Channels.channel_name, Videos.video_title;''',
+        "Which videos have the highest number of likes, and what are their corresponding channel names?":
+		         """SELECT channel_name, video_title, video_likecount
                  FROM Videos 
                  JOIN Channels ON Channels.channel_id=Videos.channel_id
                  ORDER BY video_likecount DESC
-                 LIMIT 1;""",
+                 LIMIT 5;""",
         "What is the total number of likes for each video, and what are their corresponding video names?":	          
-                """SELECT Videos.video_title, SUM(Videos.Video_likecount) AS total_likes
-                  FROM Videos
-                  GROUP BY videos.video_title;""",
+                '''SELECT Channels.channel_name, Videos.video_title, SUM(Videos.video_likecount) AS total_likes
+                   FROM Videos
+                   JOIN Channels ON Channels.channel_id = Videos.channel_id
+                   GROUP BY Channels.channel_name, Videos.video_title;''',
         "What is the total number of views for each channel, and what are their corresponding channel names?": 
 		          """SELECT channel_name, SUM(video_viewcount) AS Total_views
                   FROM Videos
                   JOIN Channels ON Channels.channel_id=Videos.channel_id
                   GROUP BY channel_name;""",
         "What are the names of all the channels that have published videos in the year 2022?": 
-		          """SELECT DISTINCT Channels.channel_name
+		          """SELECT DISTINCT Channels.channel_name, Videos.Video_pubdate
                   FROM Channels
                   JOIN Videos ON Channels.channel_id = Videos.channel_id
                   WHERE YEAR(Videos.Video_pubdate) = 2022;""",
@@ -340,11 +337,11 @@ def execute_query(question):
                   JOIN Channels ON Videos.channel_id = Channels.channel_id
                   GROUP BY channel_name;""",
         "Which videos have the highest number of comments, and what are their corresponding channel names?": 
-		          """ SELECT video_title,channel_name
+		          """ SELECT video_title,channel_name, video_commentcount
                   FROM Videos
                   JOIN Channels ON Videos.channel_id = Channels.channel_id
                   ORDER BY video_commentcount DESC
-                  LIMIT 1;""" 
+                  LIMIT 5;""" 
     }
 
     query=query_mapping.get(question)
